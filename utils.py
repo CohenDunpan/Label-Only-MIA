@@ -5,7 +5,7 @@ from PIL import Image, ImageEnhance, ImageOps
 import os
 import shutil
 import pandas as pd
-from torch._utils import _accumulate
+from itertools import accumulate
 from torch import randperm
 from torch.utils.data import Subset, DataLoader, ConcatDataset
 from torchvision import datasets, transforms
@@ -142,7 +142,8 @@ def dataset_split(dataset, lengths):
     indices = list(range(sum(lengths)))
     np.random.seed(1)
     np.random.shuffle(indices)
-    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(_accumulate(lengths), lengths)]
+    offsets = list(accumulate(lengths))
+    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(offsets, lengths)]
 
 
 class Rand_Augment():

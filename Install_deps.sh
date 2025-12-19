@@ -7,6 +7,7 @@ pip install \
   runx \
   adversarial-robustness-toolbox \
   foolbox \
+  statsmodels \
   scikit-image \
   scikit-learn \
   matplotlib \

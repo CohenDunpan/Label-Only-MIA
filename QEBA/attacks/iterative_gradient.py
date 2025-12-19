@@ -1,6 +1,6 @@
 from __future__ import division
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 import abc
 import logging
 

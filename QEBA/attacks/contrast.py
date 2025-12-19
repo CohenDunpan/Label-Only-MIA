@@ -1,5 +1,5 @@
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 
 from .base import Attack
 from .base import call_decorator
