@@ -1,9 +1,7 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import argparse
 import time
 import random
-import time
 import math
 import numpy as np
 from runx.logx import logx
@@ -16,13 +14,11 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 #from models import ResNet18
 from classifier import CNN
-from utils import load_dataset, init_func, Rand_Augment
+from utils import load_dataset, init_func, Rand_Augment, fixed_seed
 from deeplearning import train_target_model, test_target_model, train_shadow_model, test_shadow_model
 from attack import AdversaryOne_Feature, AdversaryOne_evaluation, AdversaryTwo_HopSkipJump, AdversaryTwo_QEBA,AdversaryTwo_SaltandPepperNoise
 from cert_radius.certify import certify
 
-
-action = -1
 def Train_Target_Model(args):
     split_size = args.Split_Size[args.dataset_ID]
     dataset = args.datasets[args.dataset_ID]
@@ -245,6 +241,8 @@ def main():
                         help='train or attack')
     parser.add_argument('--dataset_ID', default=False, type=int, 
                         help='CIFAR10=0, CIFAR100=1, GTSRB=2, Face=3')
+    parser.add_argument('--dataset-ids', nargs='+', type=int, default=[0, 1],
+                        help='dataset indices to run sequentially')
     parser.add_argument('--datasets', nargs='+',
                         default=['CIFAR10', 'CIFAR100', 'GTSRB', 'Face'])
     parser.add_argument('--num_classes', nargs='+',
@@ -255,8 +253,8 @@ def main():
                                 [600, 500, 400, 300, 200, 100  ],  #600, 500, 400, 300, 200, 100            
                                 [350, 300, 250, 200, 150, 100  ],  #350, 300, 250, 200, 150, 100                
                                 ]) 
-    parser.add_argument('--batch-size', nargs='+', default=128, metavar='N',
-                        help='input batch size for training (default: 64)')
+    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
+                        help='input batch size for training (default: 128)')
     parser.add_argument('--epochs', type=int, default=200, metavar='N',
                         help='number of epochs to train (default: 200)')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
@@ -276,37 +274,44 @@ def main():
     parser.add_argument('--mode_type', type=str, default='',
                         help='the type of action referring to the load dataset')
     parser.add_argument('--advOne_metric', type=str, default='Loss_visual', help='AUC of Loss, Entropy, Maximum respectively; or Loss_visual')
+    parser.add_argument('--action', type=int, default=0, choices=[0, 1, 2, 3, 4, 5, 6],
+                        help='pipeline action: 0=train target, 1=train shadow, 2=train shadow (vary size), 3=adversary one, 4=adversary one (vary size), 5=adversary two, 6=decision radius')
+    parser.add_argument('--gpus', type=str, default='',
+                        help='comma separated GPU ids to expose (e.g., "0" or "0,1"), leave empty to use default visibility')
     
     args = parser.parse_args()
+    if args.gpus:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
 
-    for dataset_idx in [0,1]:
+    fixed_seed(args)
+
+    for dataset_idx in args.dataset_ids:
+        if dataset_idx >= len(args.datasets):
+            raise ValueError('dataset_idx {} out of range for datasets {}'.format(dataset_idx, len(args.datasets)))
         args.dataset_ID = dataset_idx
-        args.logdir = 'results'+'/' + args.datasets[args.dataset_ID]
-        action = 0
-        # train
-        if action == 0:
+        args.logdir = os.path.join('results', args.datasets[args.dataset_ID])
+        os.makedirs(args.logdir, exist_ok=True)
+
+        if args.action == 0:
             args.mode_type = 'target'
             Train_Target_Model(args)
-        elif action == 1:
+        elif args.action == 1:
             args.mode_type = 'shadow'
             Train_Shadow_Model(args)
-        elif action == 2: 
-            args.logdir = 'results/CIFAR100' 
+        elif args.action == 2:
+            args.logdir = os.path.join('results', 'CIFAR100')
             Train_Shadow_Model_ChangeDataSize(args)
-
-
-        # attack
-        elif action == 3:
+        elif args.action == 3:
             AdversaryOne(args)
-        elif action == 4:    
-            args.logdir = 'results/CIFAR100'  
+        elif args.action == 4:
+            args.logdir = os.path.join('results', 'CIFAR100')
             AdversaryOne_ChangeDataSize(args)
-        elif action == 5:
+        elif args.action == 5:
             AdversaryTwo(args, Random_Data=False)
-
-        # others
-        elif action == 6:
+        elif args.action == 6:
             Decision_Radius(args)
+        else:
+            raise ValueError('Unknown action {}'.format(args.action))
 
 if __name__ == "__main__":
     main()
